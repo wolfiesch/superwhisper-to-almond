@@ -41,14 +41,14 @@ Switching from [SuperWhisper](https://superwhisper.com) to [Almond](https://almo
 ## Install
 
 ```bash
-curl -O https://raw.githubusercontent.com/wolfgangschoenberger/superwhisper-to-almond/main/sw2almond.py
+curl -O https://raw.githubusercontent.com/wolfiesch/superwhisper-to-almond/main/sw2almond.py
 chmod +x sw2almond.py
 ```
 
 Or clone:
 
 ```bash
-git clone https://github.com/wolfgangschoenberger/superwhisper-to-almond.git
+git clone https://github.com/wolfiesch/superwhisper-to-almond.git
 ```
 
 ## Quick Start
