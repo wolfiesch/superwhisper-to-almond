@@ -27,6 +27,7 @@ import glob
 import json
 import os
 import shutil
+import subprocess
 import sys
 from datetime import datetime
 
@@ -250,7 +251,8 @@ def backup_file(path):
     return backup_path
 
 
-def print_summary(vocabulary, replacements, new_entries, stats, dry_run=True):
+def print_summary(vocabulary, replacements, new_entries, stats, existing_keys,
+                   dry_run=True):
     """Print a human-readable migration summary."""
     print()
     print("=" * 60)
@@ -282,10 +284,13 @@ def print_summary(vocabulary, replacements, new_entries, stats, dry_run=True):
     print(f"  Already in Almond (skipped):   {stats['skipped']}")
     print()
 
-    # Show what would be added
+    # Show only entries that would actually be added (not skipped)
     if stats["added"] > 0:
         print("  New entries:")
-        for entry in sorted(new_entries.values(), key=lambda e: e["canonical"].lower()):
+        for key, entry in sorted(new_entries.items(),
+                                  key=lambda kv: kv[1]["canonical"].lower()):
+            if key in existing_keys:
+                continue  # Already in Almond, skip display
             canonical = entry["canonical"]
             variants = entry.get("variants", [])
             variant_str = f" (variants: {', '.join(variants)})" if variants else ""
@@ -351,6 +356,11 @@ Examples:
         action="store_true",
         help="Output results as JSON (for scripting)",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Apply even if Almond is running (not recommended)",
+    )
 
     args = parser.parse_args()
 
@@ -375,11 +385,46 @@ Examples:
         )
         sys.exit(1)
 
-    print(f"  SuperWhisper data: {sw_path}")
+    # Check if Almond is running (critical: Almond overwrites dictionary.json)
+    if args.apply and not args.export:
+        try:
+            result = subprocess.run(
+                ["pgrep", "-f", "Almond.app"],
+                capture_output=True, text=True,
+            )
+            if result.returncode == 0:
+                print(
+                    "\n  WARNING: Almond is currently running!",
+                    file=sys.stderr,
+                )
+                print(
+                    "  Almond may overwrite dictionary.json with its in-memory state,",
+                    file=sys.stderr,
+                )
+                print(
+                    "  which would discard the migrated entries.",
+                    file=sys.stderr,
+                )
+                print(
+                    "\n  Please quit Almond first, then re-run this command.",
+                    file=sys.stderr,
+                )
+                print(
+                    "  (Use --force to apply anyway, at your own risk.)\n",
+                    file=sys.stderr,
+                )
+                if not args.force:
+                    sys.exit(1)
+        except FileNotFoundError:
+            pass  # pgrep not available, skip check
+
+    if not args.json:
+        print(f"  SuperWhisper data: {sw_path}")
 
     # Find Almond
     almond_path = args.almond_path or find_almond_dict_path()
-    print(f"  Almond dictionary: {almond_path}")
+    if not args.json:
+        print(f"  Almond dictionary: {almond_path}")
 
     # Load SuperWhisper data
     vocabulary, replacements = load_superwhisper_settings(
@@ -399,6 +444,9 @@ Examples:
     almond_dict = load_almond_dictionary(almond_path)
     merged, stats = merge_dictionaries(almond_dict, new_entries)
 
+    # Track existing keys for display purposes
+    existing_keys = set(almond_dict.get("entries", {}).keys())
+
     # Output
     if args.json:
         result = {
@@ -412,7 +460,8 @@ Examples:
         }
         print(json.dumps(result, indent=2))
     else:
-        print_summary(vocabulary, replacements, new_entries, stats, dry_run=not args.apply)
+        print_summary(vocabulary, replacements, new_entries, stats,
+                       existing_keys, dry_run=not args.apply)
 
     # Write if --apply or --export
     if args.export:

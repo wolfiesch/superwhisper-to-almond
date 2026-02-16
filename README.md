@@ -1,61 +1,94 @@
-# sw2almond
+<p align="center">
+  <h1 align="center">sw2almond</h1>
+  <p align="center">
+    <strong>Migrate your speech-to-text vocabulary from SuperWhisper to Almond.</strong><br>
+    Single file. Zero dependencies. Dry-run by default.
+  </p>
+</p>
 
-Migrate your custom vocabulary from [SuperWhisper](https://superwhisper.com) to [Almond](https://almondvoice.com) on macOS.
+<p align="center">
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/license-MIT-green" alt="License"></a>
+  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.8+-blue" alt="Python 3.8+"></a>
+  <a href="#"><img src="https://img.shields.io/badge/platform-macOS-lightgrey" alt="macOS"></a>
+  <a href="#"><img src="https://img.shields.io/badge/dependencies-0-orange" alt="Zero dependencies"></a>
+</p>
 
-Both apps are speech-to-text transcription tools for macOS. If you're switching from SuperWhisper to Almond, this tool transfers your custom vocabulary, spelling corrections, and text replacements so you don't have to re-enter them manually.
+---
 
-## What gets migrated
+Switching from [SuperWhisper](https://superwhisper.com) to [Almond](https://almondvoice.com)? This tool transfers your custom vocabulary, spelling corrections, and text replacements so you don't re-enter them manually.
 
-| SuperWhisper Feature | Almond Equivalent | Migrated? |
-|---|---|---|
-| Custom vocabulary terms | Dictionary entries | Yes |
-| Spelling corrections (e.g., "Shure dog" → "Sherdog") | Dictionary entries with variants | Yes |
-| Text expansion macros (e.g., "input my email" → your email) | Dictionary entries with variants | Optional (`--include-macros`) |
-| Slash commands (e.g., "Slash Compact" → "/compact") | N/A | No (not applicable) |
-| Recording modes | N/A | No (different architecture) |
+```
+============================================================
+  SuperWhisper -> Almond Migration Summary
+============================================================
 
-## Requirements
+  SuperWhisper vocabulary terms: 31
+  SuperWhisper replacements:     12
+    - Spelling corrections: 5
+    - Text macros:          4
+    - Slash commands:        3 (skipped)
 
-- macOS
-- Python 3.8+
-- SuperWhisper installed (or its data directory available)
-- Almond installed
+  New Almond entries to add:     28
+  Variants merged into existing: 2
+  Already in Almond (skipped):   3
 
-## Installation
+  Mode: DRY RUN (no changes made)
+  Run with --apply to write changes
 
-No dependencies needed — it's a single Python script using only the standard library.
+============================================================
+```
+
+## Install
 
 ```bash
-# Clone or download
-git clone https://github.com/yourusername/superwhisper-to-almond.git
-cd superwhisper-to-almond
-
-# Or just download the script
-curl -O https://raw.githubusercontent.com/yourusername/superwhisper-to-almond/main/sw2almond.py
+curl -O https://raw.githubusercontent.com/wolfgangschoenberger/superwhisper-to-almond/main/sw2almond.py
 chmod +x sw2almond.py
 ```
 
+Or clone:
+
+```bash
+git clone https://github.com/wolfgangschoenberger/superwhisper-to-almond.git
+```
+
+## Quick Start
+
+```bash
+# 1. Preview what will be migrated (safe — no changes)
+python3 sw2almond.py
+
+# 2. Quit Almond, then apply
+python3 sw2almond.py --apply
+
+# 3. Restart Almond — vocabulary is live
+```
+
+> **Important:** Quit Almond before running `--apply`. Almond holds vocabulary in memory and will overwrite your changes if it's running. The tool checks for this and will warn you.
+
+## What Gets Migrated
+
+| SuperWhisper Feature | Almond Equivalent | Migrated? |
+|---|---|---|
+| **Custom vocabulary** (recognition hints) | Dictionary entries | Yes |
+| **Spelling corrections** ("Shure dog" → "Sherdog") | Entries with variants | Yes |
+| **Text macros** ("input my email" → your email) | Entries with variants | Optional (`--include-macros`) |
+| **Slash commands** ("Slash Compact" → `/compact`) | — | No (not applicable) |
+
+## Features
+
+| Category | Details |
+|----------|---------|
+| **Safety** | Dry-run by default, timestamped backups, Almond-running detection |
+| **Recovery** | `--scan-backups` recovers vocabulary from all SuperWhisper backup files |
+| **Merge** | Non-destructive — existing Almond entries preserved, variants merged |
+| **Portability** | Single file, zero dependencies, Python 3.8+ stdlib only |
+| **Output** | `--json` for scripting, `--export` to write to custom file |
+
 ## Usage
 
-### Preview (dry run)
+### Recover vocabulary from backups
 
-```bash
-# See what would be migrated — no changes made
-python3 sw2almond.py
-```
-
-### Apply migration
-
-```bash
-# Write changes to Almond's dictionary
-python3 sw2almond.py --apply
-```
-
-A timestamped backup of your Almond dictionary is created automatically before any changes.
-
-### Scan backup files
-
-SuperWhisper creates backup files when settings change. If you've removed vocabulary terms over time, scanning backups recovers the most comprehensive set:
+SuperWhisper creates backup files when settings change. Scan them all to build the most comprehensive vocabulary set:
 
 ```bash
 python3 sw2almond.py --scan-backups --apply
@@ -63,15 +96,13 @@ python3 sw2almond.py --scan-backups --apply
 
 ### Include text macros
 
-By default, personal info macros (like email/address expansions) are skipped since they're typically not dictionary terms. Include them with:
+Personal info expansions (email, address, URLs) are skipped by default:
 
 ```bash
 python3 sw2almond.py --include-macros --apply
 ```
 
 ### Custom paths
-
-If your data directories are in non-standard locations:
 
 ```bash
 python3 sw2almond.py \
@@ -80,77 +111,55 @@ python3 sw2almond.py \
   --apply
 ```
 
-### Export to file
-
-Preview the merged dictionary without modifying Almond:
+### Export without modifying Almond
 
 ```bash
 python3 sw2almond.py --scan-backups --export merged.json
 ```
 
-### JSON output (for scripting)
+### JSON output for scripting
 
 ```bash
-python3 sw2almond.py --json
+python3 sw2almond.py --json | jq '.migration'
 ```
 
-## How it works
+## How It Works
 
-### SuperWhisper data format
-
-SuperWhisper stores settings at `~/Documents/superwhisper/settings/settings.json`:
-
-```json
-{
-  "vocabulary": ["Claude", "Vercel", "Sherdog"],
-  "replacements": [
-    {"id": "uuid", "original": "Shure dog", "with": "Sherdog"}
-  ]
-}
+```
+SuperWhisper                          Almond
+┌─────────────────────┐    classify    ┌─────────────────────────┐
+│ vocabulary: [        │──────────────▶│ entries: {              │
+│   "Claude",          │               │   "claude": {           │
+│   "Sherdog"          │               │     canonical: "Claude", │
+│ ]                    │               │     variants: []        │
+│                      │               │   },                    │
+│ replacements: [      │    merge      │   "sherdog": {          │
+│   {original: "Shure  │──────────────▶│     canonical: "Sherdog",│
+│    dog",             │               │     variants:           │
+│    with: "Sherdog"}  │               │       ["Shure dog"]     │
+│ ]                    │               │   }                     │
+└─────────────────────┘               └─────────────────────────┘
 ```
 
-### Almond data format
-
-Almond stores its dictionary at `~/Library/Application Support/Almond/dictionary.json`:
-
-```json
-{
-  "entries": {
-    "sherdog": {
-      "canonical": "Sherdog",
-      "isAutoAdded": false,
-      "variants": ["Shure dog"]
-    }
-  },
-  "version": 1
-}
-```
-
-### Migration logic
-
-1. **Vocabulary terms** become dictionary entries where the lowercase term is the key and the original casing is preserved as `canonical`
-2. **Spelling corrections** (replacements where the output is a simple correction) become entries with the misspoken form added as a `variant`
-3. **Text macros** (replacements that expand to personal info, URLs, etc.) are optionally included
-4. **Slash commands** are skipped (they don't map to dictionary concepts)
-5. **Existing Almond entries** are preserved — new variants are merged, nothing is overwritten
-
-## After migrating
-
-Restart Almond to pick up the new vocabulary. Your dictionary entries will be active immediately.
+1. **Vocabulary terms** → dictionary entries (lowercase key, original casing as `canonical`)
+2. **Spelling corrections** → entries with the misspoken form as a `variant`
+3. **Text macros** → optionally included (skipped by default)
+4. **Slash commands** → skipped (no dictionary equivalent)
+5. **Existing entries** → preserved (new variants merged, nothing overwritten)
 
 ## Reverting
 
-The tool creates a timestamped backup before writing. To revert:
+Every `--apply` creates a timestamped backup:
 
 ```bash
-# Find your backup
-ls "~/Library/Application Support/Almond/dictionary.json.backup."*
+# List backups
+ls ~/Library/Application\ Support/Almond/dictionary.json.backup.*
 
-# Restore it
-cp "~/Library/Application Support/Almond/dictionary.json.backup.TIMESTAMP" \
+# Restore
+cp "~/Library/Application Support/Almond/dictionary.json.backup.20260216_053939" \
    "~/Library/Application Support/Almond/dictionary.json"
 ```
 
 ## License
 
-MIT
+[MIT](LICENSE)
